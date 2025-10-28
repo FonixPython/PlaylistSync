@@ -20,15 +20,15 @@ class Config:
             },
         },
         "download_settings": {
-            "final_codec": "mp3",  # ["mp3","opus","aac","wav"]
-            "encode_quality": 0,   # 0 = best, 10 = worst
+            "encode_codec": "mp3",  # ["mp3","opus","aac","wav"]
+            "encode_quality": 8,   # 10 = best, 0 = worst
             "temp_path": ".TEMP",
             "cache_path": ".CACHE",
             "download_path": "./Music",
             "filename_template": "$title$ - $artist$",
-            "cover_mode": "crop",  # crop, stretch
-        },
-        "api_keys": {"youtube_api_key": None},
+            "cover_mode": "crop",  # crop, stretch,
+            "max_threads":8
+        }
     }
 
     def __init__(self, filepath: str = "./config.json") -> None:
@@ -62,17 +62,30 @@ class Config:
             self.save()
 
     def save(self) -> None:
-        """Safely save configuration to disk (atomic write)."""
+        """Safely save configuration to disk (atomic write when possible)."""
         if not self._config:
             raise BufferError("Config is empty and cannot be saved.")
-        tmp_fd, tmp_path = tempfile.mkstemp()
+
+        # Create temp file in the same directory to ensure same filesystem
+        dirpath = os.path.dirname(os.path.abspath(self.filepath))
+        tmp_fd, tmp_path = tempfile.mkstemp(dir=dirpath)
         try:
             with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
                 json.dump(self._config, f, indent=4)
-            os.replace(tmp_path, self.filepath)
+            try:
+                os.replace(tmp_path, self.filepath)  # atomic within same FS
+            except OSError as e:
+                import errno, shutil
+                if e.errno == errno.EXDEV:  # cross-device link error
+                    shutil.move(tmp_path, self.filepath)
+                else:
+                    raise
         finally:
             if os.path.exists(tmp_path):
-                os.remove(tmp_path)
+                try:
+                    os.remove(tmp_path)
+                except FileNotFoundError:
+                    pass
 
     def get(self, path: str, default: Optional[Any] = None) -> Any:
         """Get a config value by dotted path (e.g., 'appearance.mode')."""

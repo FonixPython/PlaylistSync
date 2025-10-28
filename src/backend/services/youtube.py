@@ -1,14 +1,21 @@
-from .. import helper_functions
 import yt_dlp
 import ytmusicapi
+import ping3
+import re
 
+def check_network():
+    is_online = ping3.ping("1.1.1.1")
+    return is_online
+
+def sanitize(s):
+    return re.sub(r'[<>:"/\\|?*\']', '', s)
 
 class YouTube():
     def __init__(self):
         self.yt_music_api = ytmusicapi.YTMusic()
 
     def download_track(self, youtube_id: str = None, download_folder: str = None):
-        if not helper_functions.check_network():
+        if not check_network():
             raise ConnectionError("No internet connection!")
         if youtube_id is None:
             raise ValueError("No youtube id given!")
@@ -18,7 +25,7 @@ class YouTube():
             ValueError("Invalid youtube id given!")
         ydl_config = {
             'format': "bestaudio/best",
-            'outtmpl': download_folder,
+            'outtmpl': f"{download_folder}/{youtube_id}.%(ext)s",
             'quiet': True
         }
         try:
@@ -26,10 +33,10 @@ class YouTube():
                 info = ydl.extract_info(f"https://music.youtube.com/watch?v={youtube_id}")
 
             audio_file = info["requested_downloads"][0]["filepath"]
-            title = helper_functions.sanitize(info.get('title', "Unknown Title"))
+            title = sanitize(info.get('title', "Unknown Title"))
             artist_list = info.get('artists', [info.get('uploader', "Unknown Artist")])
-            artist_str = helper_functions.sanitize(", ".join(artist_list))
-            album = helper_functions.sanitize(info.get('album', "Unknown Album"))
+            artist_str = sanitize(", ".join(artist_list))
+            album = sanitize(info.get('album', "Unknown Album"))
             release_year = info.get('release_year') or int(info.get('upload_date', "20000000")[0:4] or 0)
             length = info.get('duration', 200)
             covers = info.get('thumbnails')
@@ -42,16 +49,19 @@ class YouTube():
                 "id": id,
                 "title": title,
                 "artists": artist_list,
+                "artist":artist_str,
                 "album": album,
                 "release": release_year,
-                "file_path": audio_file
+                "length": length,
+                "cover_url": cover_url,
+                "file_path": audio_file,
             }
 
         except Exception as e:
             raise e
 
     def get_playlist(self, youtube_id: str = None):
-        if not helper_functions.check_network():
+        if not check_network():
             raise ConnectionError("No internet connection!")
         if youtube_id is None:
             raise ValueError("No youtube id given!")
@@ -59,22 +69,28 @@ class YouTube():
             ValueError("Invalid youtube id given!")
 
         try:
-            data = self.yt_music_api.get_playlist(playlistId=id, limit=None)
+            data = self.yt_music_api.get_playlist(playlistId=youtube_id, limit=None)
             return_dict = {}
+
             return_dict["tracks"] = []
             for track in data["tracks"]:
+                print(track)
                 track_dict = {}
                 track_dict["title"] = track.get("title", "Unknown title")
                 track_dict["artists"] = [i.get("name", "Unknown artist") for i in track.get("artists")] if track.get(
                     "artists") is not None else ["Unknown artist"]
-                track_dict["album"] = track.get("album", {}).get("name", "Unknown album")
+                try:
+                    track_dict["album"] = track.get("album", {}).get("name", "Unknown album")
+                except Exception as e:
+                    print(e)
                 track_dict["duration_seconds"] = track.get("duration", 0)
                 track_dict["thumbnail"] = track.get("thumbnails")[0]["url"].split("=")[0] + "=w600-h600" if track.get(
                     "thumbnails") is not None else None
+                track_dict["youtube_id"] = track["videoId"]
                 return_dict["tracks"].append(track_dict)
-            playlist_info = {}
-            playlist_info["title"] = data.get("title", "Unknwon Title")
-            playlist_info["thumbnail"] = data.get("thumbnails", [])[-1].get("url", None)
+
+            return_dict["title"] = data.get("title", "Unknwon Title")
+            return_dict["thumbnail"] = data.get("thumbnails", [])[-1].get("url", None)
 
             return return_dict
 

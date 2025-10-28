@@ -3,7 +3,7 @@ import json
 import os
 import tempfile
 import time
-import helper_functions
+import backend.helper_functions as helper_functions
 
 
 class Library:
@@ -20,6 +20,7 @@ class Library:
             raise FileNotFoundError("The filepath doesn't exist!")
 
         self.filepath = os.path.join(filepath, "library.json")
+
         self._library: dict[str, Any] = {}
         if not os.path.exists(self.filepath):
             self.DEFAULTS["createdOn"] = time.time()
@@ -42,17 +43,30 @@ class Library:
             json.dump(self._library, f, indent=4)
 
     def _save(self) -> None:
+        """Safely save configuration to disk (atomic write when possible)."""
         if not self._library:
             raise BufferError("Config is empty and cannot be saved.")
-        tmp_fd, tmp_path = tempfile.mkstemp()
+
+        # Create temp file in the same directory to ensure same filesystem
+        dirpath = os.path.dirname(os.path.abspath(self.filepath))
+        tmp_fd, tmp_path = tempfile.mkstemp(dir=dirpath)
         try:
             with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
                 json.dump(self._library, f, indent=4)
-            os.replace(tmp_path, self.filepath)
+            try:
+                os.replace(tmp_path, self.filepath)  # atomic within same FS
+            except OSError as e:
+                import errno, shutil
+                if e.errno == errno.EXDEV:  # cross-device link error
+                    shutil.move(tmp_path, self.filepath)
+                else:
+                    raise
         finally:
             if os.path.exists(tmp_path):
-                os.remove(tmp_path)
-
+                try:
+                    os.remove(tmp_path)
+                except FileNotFoundError:
+                    pass
     def _get(self, path: str, default: Optional[Any] = None) -> Any:
         keys = path.split(".")
         value = self._library
@@ -112,14 +126,13 @@ class Library:
         if playlist_id and track_id:
             if not self.verify_library_path(playlist_id):
                 raise ValueError("Playlist given does not exist!")
-            if data.get("title", None) is not None and data.get("artist", None) is not None and data.get("album",
-                                                                                                         None) is not None and data.get(
-                    "date", None) is not None and data.get("length", None) is not None:
+            if data.get("title", None) is not None and data.get("artist", None) is not None and data.get("album",None) is not None:
                 data["success"] = False
                 data["playlist_id"] = playlist_id
                 data["track_id"] = track_id
                 data["file_info"] = {}
                 self._set(path=f"playlists.{playlist_id}.items.{track_id}", value=data)
+                self._save()
             else:
                 raise ValueError("Needed values weren't given!")
         else:
@@ -132,6 +145,7 @@ class Library:
             for key in data:
                 if key in self.get_track_full(playlist_id, track_id).keys():
                     self._set(path=f"playlists.{playlist_id}.items.{track_id}.{key}", value=data[key])
+            self._save()
         else:
             raise ValueError("No library path was given!")
 
@@ -140,6 +154,7 @@ class Library:
             if not self.verify_library_path(playlist_id, track_id):
                 raise ValueError("Library given does not exist!")
             self._delete(path=f"playlists.{playlist_id}.items.{track_id}")
+            self._save()
         else:
             raise ValueError("No library path was given!")
 
@@ -157,7 +172,8 @@ class Library:
         if playlist_id:
             if not self.verify_library_path(playlist_id):
                 raise ValueError("Library given does not exist!")
-            return dict(self._get(path=f"playlists.{playlist_id}.items", default={}))
+            return_list = [self._get(path=f"playlists.{playlist_id}.items.{item}", default={}) for item in self._get(path=f"playlists.{playlist_id}.items", default={})]
+            return return_list
         else:
             raise ValueError("No library path was given!")
 
@@ -184,6 +200,7 @@ class Library:
                 "items": {}
             }
             self._set(path=f"playlists.{playlist_id}", value=playlist_dict)
+            self._save()
             return playlist_dict
         else:
             raise ValueError("No library path or data was given!")
@@ -195,6 +212,7 @@ class Library:
             for key in data:
                 if key in self.get_playlist_full(playlist_id).keys() and key not in ["items", "blacklist"]:
                     self._set(path=f"playlists.{playlist_id}.{key}", value=data[key])
+            self._save()
         else:
             raise ValueError("No library path or data was given!")
 
@@ -203,6 +221,7 @@ class Library:
             if not self.verify_library_path(playlist_id):
                 raise ValueError("Library given does not exist!")
             return list(self._get(path=f"playlists.{playlist_id}.blacklist", default=[]))
+            self._save()
         else:
             raise ValueError("No library path was given!")
 
@@ -216,7 +235,7 @@ class Library:
             blacklist_array = self._get(f"playlists.{playlist_id}.blacklist", default=[])
             blacklist_array.append(item_id)
             self._set(path=f"playlists.{playlist_id}.blacklist", value=blacklist_array)
-
+            self._save()
 
         else:
             raise ValueError("No playlist id or no item id was given!")
@@ -232,6 +251,7 @@ class Library:
                 if item != item_id:
                     out_array.append(item)
             self._set(path=f"playlists.{playlist_id}.blacklist", value=list(out_array))
+            self._save()
         else:
             raise ValueError("No playlist id or no item id was given!")
 
@@ -240,6 +260,7 @@ class Library:
             if not self.verify_library_path(playlist_id):
                 raise ValueError("Library given does not exist!")
             self._delete(path=f"playlists.{playlist_id}")
+            self._save()
         else:
             raise ValueError("No library path was given!")
 

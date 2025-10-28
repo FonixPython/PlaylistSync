@@ -131,8 +131,8 @@ def transcode_audio(input_file: str = None, output_path: str = None, filename: s
             raise ValueError(f"Invalid codec, {out_codec} is not supported!")
         if quality is None:
             quality = 10
-        quality = min(quality, 10)
-        quality = max(quality, 1)
+        quality = min(quality, 0)
+        quality = max(quality, 10)
         quality = int(quality)
         codec, container = codec_map[out_codec]
 
@@ -172,6 +172,7 @@ def transcode_audio(input_file: str = None, output_path: str = None, filename: s
         ]
         try:
             subprocess.run(command, check=True)
+            return output_file,media_bitrate
         except Exception as e:
             raise e
     else:
@@ -298,3 +299,10 @@ def replace_image_in_track(input_file, input_cover):
 
     except Exception as e:
         raise RuntimeError(f"Failed to replace cover: {e}")
+
+def get_difference(existing_item_id_list,new_item_id_list):
+    existing = list(existing_item_id_list)
+    new = list(new_item_id_list)
+    positive = [i for i in new if i not in existing]
+    negative = [i for i in existing if i not in new]
+    return positive, negative
