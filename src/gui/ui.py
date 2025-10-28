@@ -83,13 +83,15 @@ class MainWindow(QMainWindow):
         self.trackSelectorActionContainer = QWidget(self.trackSelectorContainer)
         self.trackSelectorActionLayout = QHBoxLayout()
 
-        self.syncPlaylistButton = QPushButton(QPixmap("gui/static/sync_icon.png"),"Sync")
+        self.syncPlaylistButton = QPushButton("Sync")
+        self.syncPlaylistButton.setIcon(QIcon("gui/static/sync_icon.png"))
         self.syncPlaylistButton.clicked.connect(self._sync_playlist)
         self.trackSelectorActionLayout = QHBoxLayout()
         self.trackSelectorActionLayout.addWidget(self.syncPlaylistButton)
 
 
         self.trackSelectorActionContainer.setLayout(self.trackSelectorActionLayout)
+        self.trackSelectorLayout.addWidget(self.trackSelectorActionContainer)
 
         self.trackSelectorTreeView = QTreeView()
         self.trackSelectorTreeModel = QStandardItemModel()
