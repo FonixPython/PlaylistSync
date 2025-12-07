@@ -19,6 +19,7 @@ class Backend():
         self.youtubeInstance = youtube.YouTube()
         self.threadingInstance = threader.QueueSystem(max_threads= self.MAX_THREADS)
         self.refresh_hashmaps()
+        self.missing = {}
 
     def set_constants(self):
         self.configInstance = config.Config()
@@ -38,16 +39,16 @@ class Backend():
         cached_filename_list = [os.path.join(self.CACHE_PATH, f) for f in os.listdir(self.CACHE_PATH) if
                                 os.path.isfile(os.path.join(self.CACHE_PATH, f))]
         self.cached_hash_map = {helper_functions.hash_file(i): i for i in cached_filename_list}
-        playlist_folder_list = [os.path.join(self.DOWNALOD_FOLDER, f) for f in os.listdir(self.DOWNALOD_FOLDER) if
-                                not os.path.isfile(os.path.join(self.DOWNALOD_FOLDER, f))]
+        playlist_folder_list = [os.path.join(self.DOWNLOAD_FOLDER, f) for f in os.listdir(self.DOWNLOAD_FOLDER) if
+                                not os.path.isfile(os.path.join(self.DOWNLOAD_FOLDER, f))]
         self.song_hash_map = {}
         for i in playlist_folder_list:
             if os.path.exists(os.path.join(i, ".id_file")):
                 with open(os.path.join(i, ".id_file"), "r") as f:
                     data = json.load(f)
-                song_filename_list = [os.path.join(self.DOWNALOD_FOLDER, i, f) for f in
-                                      os.listdir(os.path.join(self.DOWNALOD_FOLDER, i)) if
-                                      os.path.isfile(os.path.join(self.DOWNALOD_FOLDER, i, f))]
+                song_filename_list = [os.path.join(self.DOWNLOAD_FOLDER, i, f) for f in
+                                      os.listdir(os.path.join(self.DOWNLOAD_FOLDER, i)) if
+                                      os.path.isfile(os.path.join(self.DOWNLOAD_FOLDER, i, f))]
                 self.song_hash_map[data.get("id")] = {helper_functions.hash_file(fn): fn for fn in song_filename_list}
 
 
@@ -58,15 +59,15 @@ class Backend():
                     song = True
                     if not j.get("file_info",{}).get("media_hash") in self.song_hash_map.get(j.get("playlist_id")):
                         song = False
+                        self.missing[j.get("track_id")][j.get("playlist_id")] = True
                     if not j.get("file_info",{}).get("cover_hash") in self.cached_hash_map:
                         file_name = str(uuid.uuid4())
                         if song is False:
                             cover_path, cover_hash = helper_functions.download_file(url=j.get("file_info",{}).get("cover_url"),save_path=f"{self.CACHE_PATH}/{file_name}.png")
                             helper_functions.adjust_image_to_square(img_path=cover_path, mode=self.COVER_MODE)
                         else:
-                            helper_functions.extract_cover_from_audio(input_file=)
-
-                        self.libraryInstance.set_track_data(playlist_id=i,track_id=j.get("playlist_id"),data={"file_info":{"cover_hash":helper_functions.hash_file(f"{self.CACHE_PATH}/{file_name}.png)}})
+                            helper_functions.extract_cover_from_audio(input_file=self.song_hash_map[j.get("playlist_id")][j.get("track_id")],output_file=f"{self.CACHE_PATH}/{file_name}.png")
+                        self.libraryInstance.set_track_data(playlist_id=i,track_id=j.get("playlist_id"),data={"file_info":{"cover_hash":helper_functions.hash_file(f"{self.CACHE_PATH}/{file_name}.png")}})
 
 
 
