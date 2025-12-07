@@ -1,6 +1,6 @@
 import sys
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QStandardItemModel, QStandardItem, QIcon, QPixmap
+from PyQt5.QtGui import QStandardItemModel, QStandardItem, QIcon, QPixmap, QPalette,QColor
 from PyQt5.QtWidgets import QMainWindow, QListWidget, QDockWidget, QTreeView, QListWidgetItem, QPushButton, QWidget, QVBoxLayout, QDialog, QLabel, QLineEdit, QMessageBox, QHBoxLayout
 
 class AddPlaylistDialog(QDialog):
@@ -124,12 +124,16 @@ class MainWindow(QMainWindow):
                 if dialog.value is not None and dialog.value != "":
                     playlist_uri = self.backendInstance.add_playlist_to_library(str(dialog.value))
                     self.backendInstance.sync_playlist(playlist_uri)
+                    self.libraryInstance._load()
+                    self._load_playlists()
+                    self._load_tracks()
             except Exception as e:
                 QMessageBox.critical(self, "Error", str(e))
 
     def _sync_playlist(self):
         self.backendInstance.sync_playlist(str(self.currentSelectedPlaylist))
-
+        self.libraryInstance._load()
+        self._load_tracks()
     def _load_playlists(self):
         self.playlistSelectorListWidget.clear()
         playlists = self.libraryInstance._get("playlists")

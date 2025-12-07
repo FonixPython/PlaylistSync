@@ -11,6 +11,8 @@ import subprocess
 from mutagen.oggopus import OggOpus
 from mutagen.flac import Picture
 from mutagen.easyid3 import EasyID3
+from mutagen.mp3 import MP3
+from mutagen.id3 import ID3, APIC
 from mutagen.mp4 import MP4, MP4Cover
 from mutagen.wave import WAVE
 import eyed3
@@ -306,3 +308,31 @@ def get_difference(existing_item_id_list,new_item_id_list):
     positive = [i for i in new if i not in existing]
     negative = [i for i in existing if i not in new]
     return positive, negative
+
+def extract_cover_from_audio(input_file,output_file):
+    if not os.path.exists(input_file):
+        raise FileNotFoundError("Input file does not exist!")
+    split_path = input_file.split(".")
+    if split_path[-1] == "mp3":
+        audio = MP3(input_file, ID3=ID3)
+        tags = audio.tags
+        for tag in tags.values():
+            if isinstance(tag, APIC):
+                with open(output_file , "wb") as f:
+                    f.write(tag.data)
+                break
+    if split_path[-1] == "m4a":
+        audio = MP4(input_file)
+        covers = audio.tags.get("covr")
+        if covers:
+            cover = covers[0]
+            with open(output_file, "wb") as f:
+                f.write(cover)
+    if split_path[-1] == "ogg":
+        audio = OggOpus(input_file)
+        pictures = audio.get("metadata_block_picture")
+        if pictures:
+            data = base64.b64decode(pictures[0])
+            picture = Picture(data)
+            with open(output_file, "wb") as f:
+                f.write(picture.data)

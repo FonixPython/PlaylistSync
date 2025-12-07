@@ -264,6 +264,9 @@ class Library:
         else:
             raise ValueError("No library path was given!")
 
+    def get_playlists(self):
+        return list(self._get(path=f"playlists", default=[]).keys())
+
     def __getitem__(self, key: str) -> Any:
         return self._library[key]
 

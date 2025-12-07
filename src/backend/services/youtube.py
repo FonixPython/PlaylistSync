@@ -75,22 +75,27 @@ class YouTube():
             return_dict["tracks"] = []
             for track in data["tracks"]:
                 print(track)
-                track_dict = {}
-                track_dict["title"] = track.get("title", "Unknown title")
-                track_dict["artists"] = [i.get("name", "Unknown artist") for i in track.get("artists")] if track.get(
-                    "artists") is not None else ["Unknown artist"]
                 try:
-                    track_dict["album"] = track.get("album", {}).get("name", "Unknown album")
+                    track_dict = {}
+                    track_dict["title"] = track.get("title", "Unknown title")
+                    track_dict["artists"] = [i.get("name", "Unknown artist") for i in track.get("artists")] if track.get(
+                        "artists") is not None else ["Unknown artist"]
+
+                    track_dict["album"] = track.get("album", {}).get("name", "Unknown album") if not track["album"] is None else "Unknown album"
+
+                    track_dict["duration_seconds"] = track.get("duration", 0)
+                    track_dict["thumbnail"] = track.get("thumbnails")[0]["url"].split("=")[0] + "=w600-h600" if track.get(
+                        "thumbnails") is not None else None
+                    track_dict["youtube_id"] = track["videoId"]
+                    return_dict["tracks"].append(track_dict)
+
                 except Exception as e:
                     print(e)
-                track_dict["duration_seconds"] = track.get("duration", 0)
-                track_dict["thumbnail"] = track.get("thumbnails")[0]["url"].split("=")[0] + "=w600-h600" if track.get(
-                    "thumbnails") is not None else None
-                track_dict["youtube_id"] = track["videoId"]
-                return_dict["tracks"].append(track_dict)
-
-            return_dict["title"] = data.get("title", "Unknwon Title")
-            return_dict["thumbnail"] = data.get("thumbnails", [])[-1].get("url", None)
+            try:
+                return_dict["title"] = data.get("title", "Unknwon Title")
+                return_dict["thumbnail"] = data.get("thumbnails", [])[-1].get("url", None)
+            except Exception as e:
+                print(e)
 
             return return_dict
 

@@ -1,5 +1,7 @@
 import os
 import uuid
+import json
+
 
 import backend.config as config
 import backend.helper_functions as helper_functions
@@ -16,7 +18,7 @@ class Backend():
         self.libraryInstance = library.Library(filepath=self.DOWNLOAD_FOLDER)
         self.youtubeInstance = youtube.YouTube()
         self.threadingInstance = threader.QueueSystem(max_threads= self.MAX_THREADS)
-
+        self.refresh_hashmaps()
 
     def set_constants(self):
         self.configInstance = config.Config()
@@ -32,7 +34,47 @@ class Backend():
         os.makedirs(self.CACHE_PATH, exist_ok=True)
         os.makedirs(self.TEMP_PATH, exist_ok=True)
 
+    def refresh_hashmaps(self):
+        cached_filename_list = [os.path.join(self.CACHE_PATH, f) for f in os.listdir(self.CACHE_PATH) if
+                                os.path.isfile(os.path.join(self.CACHE_PATH, f))]
+        self.cached_hash_map = {helper_functions.hash_file(i): i for i in cached_filename_list}
+        playlist_folder_list = [os.path.join(self.DOWNALOD_FOLDER, f) for f in os.listdir(self.DOWNALOD_FOLDER) if
+                                not os.path.isfile(os.path.join(self.DOWNALOD_FOLDER, f))]
+        self.song_hash_map = {}
+        for i in playlist_folder_list:
+            if os.path.exists(os.path.join(i, ".id_file")):
+                with open(os.path.join(i, ".id_file"), "r") as f:
+                    data = json.load(f)
+                song_filename_list = [os.path.join(self.DOWNALOD_FOLDER, i, f) for f in
+                                      os.listdir(os.path.join(self.DOWNALOD_FOLDER, i)) if
+                                      os.path.isfile(os.path.join(self.DOWNALOD_FOLDER, i, f))]
+                self.song_hash_map[data.get("id")] = {helper_functions.hash_file(fn): fn for fn in song_filename_list}
+
+
+    def check_avail(self):
+        for i in self.libraryInstance.get_playlists():
+            for j in self.libraryInstance.get_playlist_items_data(playlist_id=i):
+                if j.get("success"):
+                    song = True
+                    if not j.get("file_info",{}).get("media_hash") in self.song_hash_map.get(j.get("playlist_id")):
+                        song = False
+                    if not j.get("file_info",{}).get("cover_hash") in self.cached_hash_map:
+                        file_name = str(uuid.uuid4())
+                        if song is False:
+                            cover_path, cover_hash = helper_functions.download_file(url=j.get("file_info",{}).get("cover_url"),save_path=f"{self.CACHE_PATH}/{file_name}.png")
+                            helper_functions.adjust_image_to_square(img_path=cover_path, mode=self.COVER_MODE)
+                        else:
+                            helper_functions.extract_cover_from_audio(input_file=)
+
+                        self.libraryInstance.set_track_data(playlist_id=i,track_id=j.get("playlist_id"),data={"file_info":{"cover_hash":helper_functions.hash_file(f"{self.CACHE_PATH}/{file_name}.png)}})
+
+
+
+
+
+
     def download_track(self,library_uri:str,playlist_id:str,output_folder:str):
+        random_uuid = str(uuid.uuid4())
         service = library_uri.split(":")[0]
         item_type = library_uri.split(":")[1]
         id = library_uri.split(":")[-1]
@@ -40,7 +82,7 @@ class Backend():
             if item_type == "track":
                 if service == "youtube":
                     result_data = self.youtubeInstance.download_track(youtube_id=id,download_folder=self.TEMP_PATH)
-                    cover_path, cover_hash = helper_functions.download_file(url = result_data["cover_url"],save_path=f"{self.CACHE_PATH}/{library_uri}.png")
+                    cover_path, cover_hash = helper_functions.download_file(url = result_data["cover_url"],save_path=f"{self.CACHE_PATH}/{random_uuid}.png")
                     helper_functions.adjust_image_to_square(img_path=cover_path,mode=self.COVER_MODE)
                     filename = helper_functions.sanitize(helper_functions.template_decoder(template=self.FILENAME_TEMPLATE,data=result_data))
                     output_file,media_bitrate = helper_functions.transcode_audio(input_file=result_data["file_path"],output_path=output_folder,filename=filename,overwrite=True,out_codec=self.CODEC,quality=self.ENCODE_QUALITY)
@@ -73,7 +115,6 @@ class Backend():
                 return library_uri
             else:
                 raise ConnectionError("No internet connection.")
-
     def sync_playlist(self,library_uri:str):
         service = library_uri.split(":")[0]
         item_type = library_uri.split(":")[1]
@@ -104,6 +145,10 @@ class Backend():
             job_list = []
             output_folder = os.path.join(self.DOWNLOAD_FOLDER, helper_functions.sanitize(self.libraryInstance.get_playlist_full(library_uri).get('folder_name')))
             os.makedirs(output_folder, exist_ok=True)
+            if not os.path.exists(os.path.join(output_folder,".id")):
+                with open(os.path.join(output_folder,".id"), "w") as f:
+                    json.dump({"id": library_uri}, f)
+
             for item in self.libraryInstance.get_playlist_items_data(library_uri):
                 if item.get("success", False) == False:
                     job_list.append(
@@ -112,7 +157,6 @@ class Backend():
 
             self.threadingInstance.submit_jobs(job_list)
             self.threadingInstance.wait_completion()
-
     def reload_config(self):
         self.set_constants()
         self.libraryInstance = library.Library(filepath=self.DOWNLOAD_FOLDER)
