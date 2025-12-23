@@ -1,7 +1,7 @@
 import sys
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QStandardItemModel, QStandardItem, QIcon, QPixmap, QPalette,QColor
-from PyQt5.QtWidgets import QMainWindow, QListWidget, QDockWidget, QTreeView, QListWidgetItem, QPushButton, QWidget, QVBoxLayout, QDialog, QLabel, QLineEdit, QMessageBox, QHBoxLayout
+from PyQt5.QtWidgets import QMainWindow, QListWidget, QDockWidget, QTreeView, QListWidgetItem, QPushButton, QWidget, QVBoxLayout, QDialog, QLabel, QLineEdit, QMessageBox, QHBoxLayout, QToolBar,QAction
 
 class AddPlaylistDialog(QDialog):
     def __init__(self, prompt="Enter text:"):
@@ -33,7 +33,7 @@ class AddPlaylistDialog(QDialog):
         self.accept()  # Close dialog with QDialog.Accepted
 
 
-class MainWindow(QMainWindow):
+class       MainWindow(QMainWindow):
     def __init__(self,backend = None,library = None,config = None):
         super().__init__()
         if backend is None:
@@ -53,18 +53,31 @@ class MainWindow(QMainWindow):
         self.setWindowIcon(QIcon(QPixmap("gui/static/program_icon.png")))
         self.resize(900, 600)
 
+        self.toolbar = QToolBar("Fuck you")
+        self.addToolBar(self.toolbar)
+
+        self.add_playlist_button = QAction("Add playlist",self)
+        self.add_playlist_button.setStatusTip("This opens the wizard for a new playlist")
+        self.add_playlist_button.triggered.connect(self._add_playlist)
+        self.toolbar.addAction(self.add_playlist_button)
+
+        self.add_queue_button = QAction("New queue", self)
+        self.add_queue_button.setStatusTip("This opens a wizard for adding a new user queue")
+        ##self.add_queue_button.triggered.connect(self._add_playlist)
+        self.toolbar.addAction(self.add_queue_button)
+
+        self.show_status = QAction("Show status", self)
+        self.show_status.setStatusTip("This opens the current status of the library")
+        ##self.add_queue_button.triggered.connect(self._add_playlist)
+        self.toolbar.addAction(self.show_status)
+
         # Dock 1 — Playlist
         self.playlistSelectorContainer = QWidget(self)
         self.playlistSelectorLayout = QVBoxLayout()
 
-        self.addPlaylistButton = QPushButton("Add Playlist")
-        self.addPlaylistButton.clicked.connect(self._add_playlist)
-
-
         self.playlistSelectorListWidget = QListWidget()
         self.playlistSelectorListWidget.itemClicked.connect(self.set_selected_playlist)
 
-        self.playlistSelectorLayout.addWidget(self.addPlaylistButton)
         self.playlistSelectorLayout.addWidget(self.playlistSelectorListWidget)
 
         self.playlistSelectorContainer.setLayout(self.playlistSelectorLayout)
@@ -109,6 +122,39 @@ class MainWindow(QMainWindow):
         track_list_dock.setWidget(self.trackSelectorContainer)
         track_list_dock.setAllowedAreas(Qt.AllDockWidgetAreas)
         self.addDockWidget(Qt.LeftDockWidgetArea, track_list_dock)
+
+        # 3. Song view
+
+        self.songViewContainer = QWidget()
+        self.songViewContainerLayout = QVBoxLayout()
+        self.songViewContainer.setLayout(self.songViewContainerLayout)
+
+        self.coverLabel = QLabel("Cover")
+        self.songViewContainerLayout.addWidget(self.coverLabel)
+
+        self.titleLabel = QLabel("Title")
+        self.songViewContainerLayout.addWidget(self.titleLabel)
+
+
+        self.artistAlbumLabel = QLabel("Album - Artist")
+        self.songViewContainerLayout.addWidget(self.artistAlbumLabel)
+
+        self.yearLabel = QLabel("Year")
+        self.songViewContainerLayout.addWidget(self.yearLabel)
+
+
+
+        self.showInFolderButton = QPushButton("Show Folder", self)
+        self.songViewContainerLayout.addWidget(self.showInFolderButton)
+
+        self.moreInfoButton = QPushButton("More Info", self)
+        self.songViewContainerLayout.addWidget(self.moreInfoButton)
+
+
+        songViewDock = QDockWidget("Song View", self)
+        songViewDock.setWidget(self.songViewContainer)
+
+        self.addDockWidget(Qt.LeftDockWidgetArea, songViewDock)
 
         # Arrange horizontally next to each other
         self.splitDockWidget(playlist_dock, track_list_dock, Qt.Horizontal)

@@ -14,7 +14,7 @@ class YouTube():
     def __init__(self):
         self.yt_music_api = ytmusicapi.YTMusic()
 
-    def download_track(self, youtube_id: str = None, download_folder: str = None):
+    def download_track(self, youtube_id: str = None, download_folder: str = None,progress_hook:callable = None):
         if not check_network():
             raise ConnectionError("No internet connection!")
         if youtube_id is None:
@@ -26,7 +26,8 @@ class YouTube():
         ydl_config = {
             'format': "bestaudio/best",
             'outtmpl': f"{download_folder}/{youtube_id}.%(ext)s",
-            'quiet': True
+            'quiet': True,
+            'progress_hooks': progress_hook if progress_hook is not None else None,
         }
         try:
             with yt_dlp.YoutubeDL(ydl_config) as ydl:

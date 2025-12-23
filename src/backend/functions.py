@@ -1,7 +1,7 @@
 import os
 import uuid
 import json
-
+import math
 
 import backend.config as config
 import backend.helper_functions as helper_functions
@@ -20,6 +20,7 @@ class Backend():
         self.threadingInstance = threader.QueueSystem(max_threads= self.MAX_THREADS)
         self.refresh_hashmaps()
         self.missing = {}
+        self.progress_dict = {}
 
     def set_constants(self):
         self.configInstance = config.Config()
@@ -51,7 +52,6 @@ class Backend():
                                       os.path.isfile(os.path.join(self.DOWNLOAD_FOLDER, i, f))]
                 self.song_hash_map[data.get("id")] = {helper_functions.hash_file(fn): fn for fn in song_filename_list}
 
-
     def check_avail(self):
         for i in self.libraryInstance.get_playlists():
             for j in self.libraryInstance.get_playlist_items_data(playlist_id=i):
@@ -69,26 +69,43 @@ class Backend():
                             helper_functions.extract_cover_from_audio(input_file=self.song_hash_map[j.get("playlist_id")][j.get("track_id")],output_file=f"{self.CACHE_PATH}/{file_name}.png")
                         self.libraryInstance.set_track_data(playlist_id=i,track_id=j.get("playlist_id"),data={"file_info":{"cover_hash":helper_functions.hash_file(f"{self.CACHE_PATH}/{file_name}.png")}})
 
+    def youtube_progress_callback(self,info,playlist_id,track_id):
+        if info["status"] == "downloading":
+            downloaded = info.get("downloaded_bytes", 0)
+            total = info.get("total_bytes") or info.get("total_bytes_estimate")
+            if total:
+                percent = downloaded / total * 100
+                self.progress_dict[playlist_id][id]["status_msg"] = "Downloading from Youtube"
+                self.progress_dict[playlist_id][id]["progress_val"] = math.floor(percent)
+                print(f"{percent:.1f}%  {downloaded}/{total} bytes")
+            else:
+                self.progress_dict[playlist_id][id]["status_msg"] ="Finished downloading"
+                self.progress_dict[playlist_id][id]["progress_val"] = 100
+                print(f"{downloaded} bytes downloaded")
 
-
-
-
+        elif info["status"] == "finished":
+            print("Download finished, now processing...")
 
     def download_track(self,library_uri:str,playlist_id:str,output_folder:str):
         random_uuid = str(uuid.uuid4())
         service = library_uri.split(":")[0]
         item_type = library_uri.split(":")[1]
         id = library_uri.split(":")[-1]
+        self.progress_dict[playlist_id][id] = {"status_msg":"Starting.....","progress_val":100}
         try:
             if item_type == "track":
                 if service == "youtube":
-                    result_data = self.youtubeInstance.download_track(youtube_id=id,download_folder=self.TEMP_PATH)
+                    result_data = self.youtubeInstance.download_track(youtube_id=id,download_folder=self.TEMP_PATH,progress_hook=lambda inf:self.youtube_progress_callback(inf,playlist_id,id))
+                    self.progress_dict[playlist_id][id] = {"status_msg": "Downloading cover", "progress_val": 50}
                     cover_path, cover_hash = helper_functions.download_file(url = result_data["cover_url"],save_path=f"{self.CACHE_PATH}/{random_uuid}.png")
+                    self.progress_dict[playlist_id][id] = {"status_msg": "Finished", "progress_val": 100}
                     helper_functions.adjust_image_to_square(img_path=cover_path,mode=self.COVER_MODE)
+                    self.progress_dict[playlist_id][id] = {"status_msg": "Transcoding media", "progress_val": 0}
                     filename = helper_functions.sanitize(helper_functions.template_decoder(template=self.FILENAME_TEMPLATE,data=result_data))
                     output_file,media_bitrate = helper_functions.transcode_audio(input_file=result_data["file_path"],output_path=output_folder,filename=filename,overwrite=True,out_codec=self.CODEC,quality=self.ENCODE_QUALITY)
                     helper_functions.edit_audio_metadata(input_file=output_file,data=result_data)
                     helper_functions.replace_image_in_track(input_file=output_file,input_cover=cover_path)
+                    self.progress_dict[playlist_id][id] = {"status_msg": "Finished", "progress_val": 100}
                     print("Download complete!")
                     self.libraryInstance.set_track_data(playlist_id=playlist_id,track_id=library_uri,data=
                     {"success": True,
