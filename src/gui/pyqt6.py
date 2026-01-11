@@ -1,4 +1,4 @@
-
+import sys
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QStandardItemModel, QStandardItem, QIcon, QPixmap, QPalette, QColor, QAction
 from PyQt6.QtWidgets import (
@@ -125,7 +125,6 @@ class MainWindow(QMainWindow):
         )
         self.trackSelectorTreeView.setModel(self.trackSelectorTreeModel)
         self.trackSelectorTreeView.setSortingEnabled(True)
-        self.trackSelectorTreeView.clicked.connect(self._on_item_select)
 
         # PyQt6 Enum: Qt.SortOrder.AscendingOrder
         self.trackSelectorTreeView.sortByColumn(0, Qt.SortOrder.AscendingOrder)
@@ -154,8 +153,6 @@ class MainWindow(QMainWindow):
 
         self.yearLabel = QLabel("Year")
         self.songViewContainerLayout.addWidget(self.yearLabel)
-
-        self.songViewContainerLayout.addStretch()
 
         self.showInFolderButton = QPushButton("Show Folder", self)
         self.songViewContainerLayout.addWidget(self.showInFolderButton)
@@ -212,32 +209,6 @@ class MainWindow(QMainWindow):
         # PyQt6 Enum: Qt.ItemDataRole.UserRole
         self.currentSelectedPlaylist = str(item.data(Qt.ItemDataRole.UserRole))
         self._load_tracks()
-
-    def _on_item_select(self,index):
-        # 1. Get the model from the index
-        model = index.model()
-
-        # 2. Identify the row and the parent index
-        # (Parent is vital for nested trees!)
-        row = index.row()
-        parent = index.parent()
-
-        # 3. List to store row data
-        row_data = []
-
-        # 4. Iterate through all columns in this specific row
-        for column in range(model.columnCount(parent)):
-            # Create an index for each column in the same row
-            current_column_index = model.index(row, column, parent)
-
-            # Retrieve the data
-            data = model.data(current_column_index)
-            row_data.append(data)
-        self.titleLabel.setText(row_data[0])
-        self.artistAlbumLabel.setText(f"{row_data[2]} - {row_data[1]}")
-        self.yearLabel.setText(row_data[3])
-
-        print(f"Full Row Data: {row_data}")
 
     def _load_tracks(self):
         self.trackSelectorTreeModel.removeRows(0, self.trackSelectorTreeModel.rowCount())

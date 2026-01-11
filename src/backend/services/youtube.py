@@ -27,7 +27,6 @@ class YouTube():
             'format': "bestaudio/best",
             'outtmpl': f"{download_folder}/{youtube_id}.%(ext)s",
             'quiet': True,
-            'progress_hooks': progress_hook if progress_hook is not None else None,
         }
         try:
             with yt_dlp.YoutubeDL(ydl_config) as ydl:
