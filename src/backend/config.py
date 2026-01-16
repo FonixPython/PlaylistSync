@@ -5,20 +5,6 @@ import tempfile
 
 class Config:
     DEFAULTS = {
-        "appearance": {
-            "app_title": "Syncy",
-            "app_icon": "./icon.ico",
-            "mode": "dark",  # options: dark / light / system
-            "color_theme": "dark-blue",
-            "primary_roundness": 20,
-            "secondary_roundness": 7,
-            "saved_state": {
-                "window_position": {"x": 100, "y": 100},
-                "window_height": 800,
-                "window_width": 700,
-                "displayed_item_height": 80,
-            },
-        },
         "download_settings": {
             "encode_codec": "mp3",  # ["mp3","opus","aac","wav"]
             "encode_quality": 8,   # 10 = best, 0 = worst
